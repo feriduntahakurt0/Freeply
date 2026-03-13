@@ -105,7 +105,7 @@ GoldTheme_AccentColor      = "#D4A017"
 
 # Change this value to switch themes:
 # "Grape" | "Midnight" | "Forest" | "Sunset" | "Arctic" | "Rose" | "Charcoal" | "Gold"
-Theme = "Rose"
+Theme = "Charcoal"
 
 BackGroundColor = ""
 SideBarColor    = ""
