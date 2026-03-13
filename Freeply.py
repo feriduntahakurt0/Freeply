@@ -12,26 +12,28 @@ Folder layout expected:
 
 import os
 import sys
+import random
 import threading
 import subprocess
 import webbrowser
-import urllib.request
-import urllib.parse
+import tkinter as tk
 
 from customtkinter import *
 
 # ── Paths ─────────────────────────────────────────────────────────────────────
-BASE_DIR    = os.path.dirname(os.path.abspath(__file__))
-MUSICS_DIR  = os.path.join(BASE_DIR, "Musics")
+BASE_DIR   = os.path.dirname(os.path.abspath(__file__))
+MUSICS_DIR = os.path.join(BASE_DIR, "Musics")
 os.makedirs(MUSICS_DIR, exist_ok=True)
 
 sys.path.insert(0, os.path.join(BASE_DIR, "Settings"))
 from settings import *    # noqa: F403
 
-# ── Optional pygame for playback ──────────────────────────────────────────────
+AUDIO_EXTS = (".mp3", ".wav", ".flac", ".aac", ".m4a", ".ogg")
+
+# ── Optional pygame ───────────────────────────────────────────────────────────
 try:
     import pygame
-    pygame.mixer.init()
+    pygame.mixer.init(frequency=44100)
     PYGAME_OK = True
 except ImportError:
     PYGAME_OK = False
@@ -40,85 +42,606 @@ except ImportError:
 set_appearance_mode("light")
 set_default_color_theme("blue")
 
+PLAYER_BAR_H = 120
+VISUALISER_H = 80
+SIDEBAR_W    = 210
+
 root = CTk()
-root.geometry(windowSize)   # noqa: F405
-root.title(f"Freeply {version}")   # noqa: F405
-root.configure(fg_color=BackGroundColor)   # noqa: F405
+root.geometry(windowSize)
+root.title(f"Freeply {version}")
+root.configure(fg_color=BackGroundColor)
 root.resizable(True, True)
 
-SIDEBAR_W = 210   # fixed pixel width for the left panel
+# ═════════════════════════════════════════════════════════════════════════════
+#  PLAYER STATE
+# ═════════════════════════════════════════════════════════════════════════════
+_playlist      = []
+_current_index = 0
+_repeat_mode   = False
+_is_playing    = False
+_song_length   = 0.0
+_seek_dragging = False
+_seek_offset   = 0.0   # saniye cinsinden seek sonrası başlangıç noktası
+
+
+def get_audio_files():
+    try:
+        files = sorted([
+            f for f in os.listdir(MUSICS_DIR)
+            if os.path.isfile(os.path.join(MUSICS_DIR, f))
+            and not f.startswith(".")
+            and f.lower().endswith(AUDIO_EXTS)
+        ])
+        return [os.path.join(MUSICS_DIR, f) for f in files]
+    except FileNotFoundError:
+        return []
+
+
+def get_song_length(filepath):
+    try:
+        from mutagen import File as MutagenFile
+        audio = MutagenFile(filepath)
+        if audio and audio.info:
+            return float(audio.info.length)
+    except Exception:
+        pass
+    if PYGAME_OK:
+        try:
+            snd = pygame.mixer.Sound(filepath)
+            return snd.get_length()
+        except Exception:
+            pass
+    return 0.0
+
+
+def fmt_time(seconds):
+    seconds = max(0, int(seconds))
+    return f"{seconds // 60}:{seconds % 60:02d}"
+
+
+def parse_filename(filepath):
+    """'Sanatçı - Şarkı adı.mp3' → (artist, title). Tire yoksa ('', name)."""
+    stem = os.path.splitext(os.path.basename(filepath))[0]
+    if " - " in stem:
+        artist, _, title = stem.partition(" - ")
+        return artist.strip(), title.strip()
+    return "", stem.strip()
+
+
+def song_card(parent, filepath, on_play, width=420):
+    """İki satırlı şarkı kartı: bold şarkı adı + italic sanatçı."""
+    artist, title = parse_filename(filepath)
+
+    card = CTkFrame(parent, fg_color=SideBarColor,
+                    corner_radius=8, width=width, height=52)
+    card.pack(anchor="w", pady=3)
+    card.pack_propagate(False)
+
+    # Sol: play ikonu
+    play_btn = CTkButton(
+        card, text="♪", width=36, height=52,
+        font=("Georgia", 16), fg_color=SideBarColor,
+        text_color=SubHeaderColor, hover_color=ButtonColor,
+        corner_radius=8, command=on_play
+    )
+    play_btn.pack(side="left")
+
+    # Sağ: şarkı adı + sanatçı
+    text_frame = CTkFrame(card, fg_color=SideBarColor, corner_radius=0)
+    text_frame.pack(side="left", fill="both", expand=True, padx=(4, 8))
+
+    CTkLabel(
+        text_frame, text=title,
+        font=("Georgia", 13, "bold"),
+        text_color=SubHeaderColor,
+        fg_color=SideBarColor, anchor="w"
+    ).pack(anchor="w")
+
+    if artist:
+        CTkLabel(
+            text_frame, text=artist,
+            font=("Georgia", 11, "bold italic"),
+            text_color=BodyColor,
+            fg_color=SideBarColor, anchor="w"
+        ).pack(anchor="w")
+
+    # Kartın tamamına tıklanınca da çalsın
+    for widget in (card, text_frame):
+        widget.bind("<Button-1>", lambda e: on_play())
+
+    return card
+
 
 # ═════════════════════════════════════════════════════════════════════════════
 #  SIDEBAR
 # ═════════════════════════════════════════════════════════════════════════════
-sidebar = CTkFrame(root, width=SIDEBAR_W, fg_color=SideBarColor, corner_radius=0)   # noqa: F405
+sidebar = CTkFrame(root, width=SIDEBAR_W, fg_color=SideBarColor, corner_radius=0)
 sidebar.place(x=0, y=0, relheight=1.0)
 sidebar.pack_propagate(False)
-sidebar.grid_propagate(False)
 
 CTkLabel(
-    sidebar,
-    text=f"Freeply {version}",   # noqa: F405
-    font=HeaderFont,              # noqa: F405
-    text_color=HeaderColor,       # noqa: F405
-    fg_color=SideBarColor,        # noqa: F405
-    anchor="w"
-).pack(fill="x", padx=emptyBetweenCorner, pady=(emptyBetweenCorner + 6, 2))   # noqa: F405
+    sidebar, text=f"Freeply {version}",
+    font=HeaderFont, text_color=HeaderColor,
+    fg_color=SideBarColor, anchor="w"
+).pack(fill="x", padx=emptyBetweenCorner, pady=(emptyBetweenCorner + 6, 2))
 
 CTkLabel(
-    sidebar,
-    text="Free Music Player",
-    font=SmallFont,          # noqa: F405
-    text_color=BodyColor,    # noqa: F405
-    fg_color=SideBarColor,   # noqa: F405
-    anchor="w"
-).pack(fill="x", padx=emptyBetweenCorner, pady=(0, 14))   # noqa: F405
+    sidebar, text="Free Music Player",
+    font=SmallFont, text_color=BodyColor,
+    fg_color=SideBarColor, anchor="w"
+).pack(fill="x", padx=emptyBetweenCorner, pady=(0, 14))
 
-# Separator
-CTkFrame(sidebar, fg_color=AccentColor, height=2, corner_radius=1).pack(   # noqa: F405
-    fill="x", padx=emptyBetweenCorner, pady=(0, 12))   # noqa: F405
+CTkFrame(sidebar, fg_color=AccentColor, height=2, corner_radius=1).pack(
+    fill="x", padx=emptyBetweenCorner, pady=(0, 12))
 
 # ═════════════════════════════════════════════════════════════════════════════
 #  CONTENT AREA
 # ═════════════════════════════════════════════════════════════════════════════
-content = CTkFrame(root, fg_color=BackGroundColor, corner_radius=0)   # noqa: F405
+content = CTkFrame(root, fg_color=BackGroundColor, corner_radius=0)
 content.place(x=SIDEBAR_W, y=0, relwidth=1.0, relheight=1.0)
 
-# Utility: clear the content area
-def clear_content():
-    for widget in content.winfo_children():
-        widget.destroy()
 
-# ── Helper: section title ──────────────────────────────────────────────────
+def clear_content():
+    for w in content.winfo_children():
+        w.destroy()
+
+
 def section_title(text):
     CTkLabel(
-        content,
-        text=text,
-        font=HeaderFont,           # noqa: F405
-        text_color=HeaderColor,    # noqa: F405
-        fg_color=BackGroundColor,  # noqa: F405
-        anchor="w"
+        content, text=text,
+        font=HeaderFont, text_color=HeaderColor,
+        fg_color=BackGroundColor, anchor="w"
     ).pack(anchor="w", padx=28, pady=(26, 6))
-    CTkFrame(content, fg_color=AccentColor, height=2, corner_radius=1   # noqa: F405
+    CTkFrame(content, fg_color=AccentColor, height=2, corner_radius=1
              ).pack(fill="x", padx=28, pady=(0, 16))
+
 
 def body_text(text, padx=28, pady=(0, 10)):
     CTkLabel(
-        content,
-        text=text,
-        font=BodyFont,             # noqa: F405
-        text_color=BodyColor,      # noqa: F405
-        fg_color=BackGroundColor,  # noqa: F405
-        anchor="w",
-        wraplength=680,
-        justify="left"
+        content, text=text,
+        font=BodyFont, text_color=BodyColor,
+        fg_color=BackGroundColor,
+        anchor="w", wraplength=680, justify="left"
     ).pack(anchor="w", padx=padx, pady=pady)
+
+
+# ═════════════════════════════════════════════════════════════════════════════
+#  VISUALISER  (sits above the player bar, drawn on a tk.Canvas)
+# ═════════════════════════════════════════════════════════════════════════════
+vis_canvas = tk.Canvas(
+    root, height=VISUALISER_H,
+    bg=SideBarColor, highlightthickness=0
+)
+vis_canvas.place(
+    x=SIDEBAR_W, rely=1.0,
+    y=-(PLAYER_BAR_H + VISUALISER_H),
+    relwidth=1.0
+)
+
+VIS_BAR_COUNT = 48
+_vis_heights  = [3.0] * VIS_BAR_COUNT
+_vis_targets  = [3.0] * VIS_BAR_COUNT
+_vis_job      = None
+_current_filepath = None  # track which file is loaded for numpy analysis
+
+# Try to load numpy for real audio analysis
+try:
+    import numpy as np
+    NUMPY_OK = True
+except ImportError:
+    NUMPY_OK = False
+
+# Audio sample cache
+_audio_samples  = None   # numpy array of normalised mono samples
+_audio_sr       = 44100  # sample rate
+
+
+def _load_audio_samples(filepath):
+    """Load audio into a mono float32 numpy array via pygame's sndarray."""
+    global _audio_samples, _audio_sr
+    _audio_samples = None
+    if not NUMPY_OK or not PYGAME_OK:
+        return
+    try:
+        snd     = pygame.mixer.Sound(filepath)
+        arr     = pygame.sndarray.array(snd)
+        # Convert stereo → mono
+        if arr.ndim == 2:
+            arr = arr.mean(axis=1)
+        # Normalise to [-1, 1]
+        maxval = max(abs(arr.max()), abs(arr.min()), 1)
+        _audio_samples = arr.astype(np.float32) / maxval
+        _audio_sr      = pygame.mixer.get_init()[0]
+    except Exception:
+        _audio_samples = None
+
+
+def _get_vis_targets_from_audio():
+    """
+    Compute per-bar amplitude from the audio window around the current
+    playback position. Returns a list of VIS_BAR_COUNT floats in [0,1].
+    """
+    if _audio_samples is None or not PYGAME_OK:
+        return None
+    pos_ms = pygame.mixer.music.get_pos()
+    if pos_ms < 0:
+        return None
+
+    pos_s      = pos_ms / 1000.0
+    win_size   = 0.08                          # 80 ms window
+    start_s    = max(0.0, pos_s - win_size / 2)
+    end_s      = start_s + win_size
+    start_i    = int(start_s * _audio_sr)
+    end_i      = int(end_s   * _audio_sr)
+    end_i      = min(end_i, len(_audio_samples))
+    chunk      = _audio_samples[start_i:end_i]
+
+    if len(chunk) < VIS_BAR_COUNT:
+        return None
+
+    # Split chunk into VIS_BAR_COUNT frequency-like bands using FFT
+    fft_vals   = np.abs(np.fft.rfft(chunk))
+    fft_vals   = fft_vals[:len(fft_vals) // 2 + 1]   # keep positive freqs
+
+    if len(fft_vals) < VIS_BAR_COUNT:
+        return None
+
+    # Map FFT bins to bars (log-spaced feels more natural)
+    indices    = np.logspace(0, np.log10(len(fft_vals) - 1),
+                             VIS_BAR_COUNT + 1, dtype=int)
+    indices    = np.clip(indices, 0, len(fft_vals) - 1)
+    bars       = []
+    for j in range(VIS_BAR_COUNT):
+        lo, hi = indices[j], max(indices[j] + 1, indices[j + 1])
+        bars.append(float(fft_vals[lo:hi].mean()))
+
+    # Normalise
+    peak = max(bars) or 1.0
+    return [v / peak for v in bars]
+
+
+def _vis_update():
+    global _vis_job
+    if not vis_canvas.winfo_exists():
+        return
+    vis_canvas.delete("all")
+    w = vis_canvas.winfo_width()
+    h = VISUALISER_H
+    if w < 10:
+        _vis_job = root.after(40, _vis_update)
+        return
+
+    bar_w = w / VIS_BAR_COUNT
+    gap   = max(1, bar_w * 0.18)
+    bw    = bar_w - gap
+
+    if _is_playing:
+        audio_vals = _get_vis_targets_from_audio()
+        if audio_vals is not None:
+            # Real audio data
+            for i, v in enumerate(audio_vals):
+                _vis_targets[i] = v * (h - 4)
+        else:
+            # Fallback: animated random (no numpy / no data yet)
+            for i in range(VIS_BAR_COUNT):
+                if random.random() < 0.3:
+                    peak = random.uniform(0.04, 1.0) ** 1.5
+                    _vis_targets[i] = peak * (h - 4)
+    else:
+        for i in range(VIS_BAR_COUNT):
+            _vis_targets[i] = 3.0
+
+    for i in range(VIS_BAR_COUNT):
+        _vis_heights[i] += (_vis_targets[i] - _vis_heights[i]) * 0.25
+
+    for i in range(VIS_BAR_COUNT):
+        x0  = i * bar_w + gap / 2
+        x1  = x0 + bw
+        bh  = max(3, _vis_heights[i])
+        y0  = h - bh
+        col = HeaderColor if (bh / h) > 0.55 else AccentColor
+        vis_canvas.create_rectangle(x0, y0, x1, h, fill=col, outline="")
+
+    _vis_job = root.after(40, _vis_update)
+
+
+def start_visualiser():
+    global _vis_job
+    if _vis_job is None:
+        _vis_update()
+
+
+# ═════════════════════════════════════════════════════════════════════════════
+#  PLAYER BAR  — 3 sütun düzeni (tema renkleri)
+#  Sol: şarkı adı  |  Orta: kontroller + seek  |  Sağ: boş
+# ═════════════════════════════════════════════════════════════════════════════
+BAR_BG      = SideBarColor
+BAR_TEXT    = HeaderColor
+BAR_SUBTEXT = BodyColor
+BAR_ACCENT  = AccentColor
+BAR_BTN_FG  = ButtonColor
+
+player_bar = CTkFrame(
+    root, fg_color=BAR_BG,
+    corner_radius=0, height=PLAYER_BAR_H
+)
+player_bar.place(
+    x=SIDEBAR_W, rely=1.0, y=-PLAYER_BAR_H,
+    relwidth=1.0
+)
+player_bar.pack_propagate(False)
+
+# Üst kenara ince çizgi
+CTkFrame(player_bar, fg_color=BAR_ACCENT, height=2, corner_radius=0
+         ).pack(fill="x", side="top")
+
+# ── 3 sütunlu ana grid ────────────────────────────────────────────────────────
+bar_left   = CTkFrame(player_bar, fg_color=BAR_BG, corner_radius=0)
+bar_center = CTkFrame(player_bar, fg_color=BAR_BG, corner_radius=0)
+bar_right  = CTkFrame(player_bar, fg_color=BAR_BG, corner_radius=0)
+
+bar_left.place(  relx=0,    rely=0, relwidth=0.28, relheight=1.0)
+bar_center.place(relx=0.28, rely=0, relwidth=0.44, relheight=1.0)
+bar_right.place( relx=0.72, rely=0, relwidth=0.28, relheight=1.0)
+
+# ── SOL: müzik notu ikonu + şarkı adı ────────────────────────────────────────
+CTkLabel(
+    bar_left, text="♪",
+    font=("Georgia", 26), text_color=BAR_ACCENT,
+    fg_color=BAR_BG
+).place(relx=0.04, rely=0.5, anchor="w")
+
+song_label = CTkLabel(
+    bar_left, text="No song playing",
+    font=("Georgia", 13, "bold"), text_color=BAR_TEXT,
+    fg_color=BAR_BG, anchor="w"
+)
+song_label.place(relx=0.16, rely=0.36, anchor="w", relwidth=0.78)
+
+artist_label = CTkLabel(
+    bar_left, text="",
+    font=("Georgia", 11), text_color=BAR_SUBTEXT,
+    fg_color=BAR_BG, anchor="w"
+)
+artist_label.place(relx=0.16, rely=0.64, anchor="w", relwidth=0.78)
+
+# ── ORTA: kontrol butonları + seek slider ─────────────────────────────────────
+
+def _spoti_btn(parent, text, cmd, size=18, bold=False, width=36):
+    fw = "bold" if bold else "normal"
+    return CTkButton(
+        parent, text=text, command=cmd,
+        font=("Georgia", size, fw),
+        fg_color=BAR_BG, text_color=BAR_SUBTEXT,
+        hover_color=BAR_BTN_FG,
+        width=width, height=36, corner_radius=18
+    )
+
+ctrl_row = CTkFrame(bar_center, fg_color=BAR_BG, corner_radius=0)
+ctrl_row.place(relx=0.5, rely=0.3, anchor="center")
+
+btn_prev   = _spoti_btn(ctrl_row, "⏮",     lambda: _change_song(-1), size=16)
+btn_play   = _spoti_btn(ctrl_row, "▶",      lambda: _play_pause(),    size=20, bold=True, width=44)
+btn_next   = _spoti_btn(ctrl_row, "⏭",     lambda: _change_song(+1), size=16)
+btn_repeat = _spoti_btn(ctrl_row, "Repeat", lambda: _toggle_repeat(), size=12, width=66)
+
+# Play butonu — dolu daire görünümü, tema vurgu rengiyle
+btn_play.configure(
+    fg_color=BAR_TEXT, text_color=BAR_BG,
+    hover_color=BAR_ACCENT, corner_radius=22
+)
+
+for b in (btn_prev, btn_play, btn_next, btn_repeat):
+    b.pack(side="left", padx=5)
+
+# Seek satırı
+seek_row = CTkFrame(bar_center, fg_color=BAR_BG, corner_radius=0)
+seek_row.place(relx=0.5, rely=0.74, anchor="center", relwidth=0.96)
+
+time_left_lbl = CTkLabel(
+    seek_row, text="0:00",
+    font=("Georgia", 11), text_color=BAR_SUBTEXT,
+    fg_color=BAR_BG, width=34
+)
+time_left_lbl.pack(side="left")
+
+seek_var = tk.DoubleVar(value=0)
+seek_slider = CTkSlider(
+    seek_row, from_=0, to=100, variable=seek_var,
+    button_color=BAR_TEXT,
+    button_hover_color=BAR_ACCENT,
+    progress_color=BAR_TEXT,
+    fg_color=BAR_BTN_FG,
+    height=6
+)
+seek_slider.pack(side="left", fill="x", expand=True, padx=6)
+
+time_right_lbl = CTkLabel(
+    seek_row, text="0:00",
+    font=("Georgia", 11), text_color=BAR_SUBTEXT,
+    fg_color=BAR_BG, width=34
+)
+time_right_lbl.pack(side="left")
+
+
+# ── Playback functions (defined before buttons) ───────────────────────────────
+def _open_fallback(filepath):
+    if sys.platform == "win32":
+        os.startfile(filepath)
+    elif sys.platform == "darwin":
+        subprocess.call(["open", filepath])
+    else:
+        subprocess.call(["xdg-open", filepath])
+
+
+def _load_and_play(filepath):
+    global _is_playing, _song_length, _current_index, _seek_offset
+    if not PYGAME_OK:
+        _open_fallback(filepath)
+        name = os.path.splitext(os.path.basename(filepath))[0]
+        song_label.configure(text=f"♪  {name}  (external player)")
+        return
+
+    pygame.mixer.music.load(filepath)
+    pygame.mixer.music.play()
+    _is_playing  = True
+    _seek_offset = 0.0
+
+    # Şarkı uzunluğunu al — mutagen varsa daha güvenilir
+    length = get_song_length(filepath)
+    if length <= 0:
+        # Fallback: pygame.mixer.Sound ile tekrar dene
+        try:
+            snd    = pygame.mixer.Sound(filepath)
+            length = snd.get_length()
+        except Exception:
+            length = 1.0
+    _song_length = length
+
+    threading.Thread(target=_load_audio_samples, args=(filepath,), daemon=True).start()
+
+    artist, title = parse_filename(filepath)
+    song_label.configure(text=title if title else filepath)
+    artist_label.configure(text=artist)
+    btn_play.configure(text="⏸", fg_color=BAR_TEXT, text_color=BAR_BG)
+    time_left_lbl.configure(text="0:00")
+    time_right_lbl.configure(text=fmt_time(_song_length))
+    seek_slider.configure(from_=0, to=_song_length)
+    seek_var.set(0)
+    start_visualiser()
+
+
+def play_file(filepath, playlist=None, index=0):
+    global _playlist, _current_index
+    if playlist is not None:
+        _playlist      = playlist
+        _current_index = index
+    elif filepath not in _playlist:
+        _playlist      = [filepath]
+        _current_index = 0
+    else:
+        _current_index = _playlist.index(filepath)
+    _load_and_play(filepath)
+
+
+def _play_pause():
+    global _is_playing
+    if not PYGAME_OK:
+        return
+    if _is_playing:
+        pygame.mixer.music.pause()
+        _is_playing = False
+        btn_play.configure(text="▶", fg_color=BAR_TEXT, text_color=BAR_BG)
+    else:
+        if pygame.mixer.music.get_pos() == -1 and _playlist:
+            _load_and_play(_playlist[_current_index])
+        else:
+            pygame.mixer.music.unpause()
+            _is_playing = True
+            btn_play.configure(text="⏸", fg_color=BAR_TEXT, text_color=BAR_BG)
+            start_visualiser()
+
+
+def _change_song(direction):
+    global _current_index
+    if not _playlist:
+        return
+    # Repeat açıksa sonraki/önceki butonu mevcut şarkıyı yeniden başlatır
+    if _repeat_mode:
+        _load_and_play(_playlist[_current_index])
+        return
+    _current_index = (_current_index + direction) % len(_playlist)
+    _load_and_play(_playlist[_current_index])
+
+
+def _toggle_repeat():
+    global _repeat_mode
+    _repeat_mode = not _repeat_mode
+    btn_repeat.configure(
+        text="Repeat: ON" if _repeat_mode else "Repeat",
+        text_color=BAR_TEXT if _repeat_mode else BAR_SUBTEXT,
+        fg_color=BAR_BTN_FG if _repeat_mode else BAR_BG
+    )
+
+
+# ── Seek drag ─────────────────────────────────────────────────────────────────
+def _seek_start(event):
+    global _seek_dragging
+    _seek_dragging = True
+
+
+def _seek_end(event):
+    global _seek_dragging, _seek_offset
+    if not PYGAME_OK or not _playlist:
+        _seek_dragging = False
+        return
+    pos = seek_var.get()
+    _seek_offset = pos   # gerçek konum buradan itibaren sayılacak
+
+    if _is_playing:
+        pygame.mixer.music.set_pos(pos)
+    else:
+        pygame.mixer.music.load(_playlist[_current_index])
+        pygame.mixer.music.play(start=pos)
+        pygame.mixer.music.pause()
+
+    seek_var.set(pos)
+    time_left_lbl.configure(text=fmt_time(pos))
+    time_right_lbl.configure(text=fmt_time(max(0, _song_length - pos)))
+
+    def _release_drag():
+        global _seek_dragging
+        _seek_dragging = False
+
+    root.after(600, _release_drag)
+
+
+seek_slider.bind("<ButtonPress-1>",   _seek_start)
+seek_slider.bind("<ButtonRelease-1>", _seek_end)
+
+
+# ── Progress ticker ────────────────────────────────────────────────────────────
+def _tick():
+    global _is_playing, _current_index
+    if PYGAME_OK and _is_playing and not _seek_dragging:
+        pos_ms = pygame.mixer.music.get_pos()
+        if pos_ms == -1:
+            _is_playing = False
+            btn_play.configure(text="▶", fg_color=BAR_TEXT, text_color=BAR_BG)
+            if _repeat_mode and _playlist:
+                _load_and_play(_playlist[_current_index])
+            elif _playlist and _current_index < len(_playlist) - 1:
+                _change_song(+1)
+        else:
+            # get_pos() şarkının başından değil son play()'den itibaren sayar.
+            # _seek_offset ile gerçek konumu hesapla.
+            pos_s = _seek_offset + pos_ms / 1000.0
+            pos_s = max(0.0, min(pos_s, _song_length))  # slider sınırını asla aşma
+            seek_var.set(pos_s)
+            time_left_lbl.configure(text=fmt_time(pos_s))
+            time_right_lbl.configure(text=fmt_time(max(0, _song_length - pos_s)))
+    root.after(500, _tick)
+
+
+root.after(500, _tick)
+start_visualiser()
+
+
+# ═════════════════════════════════════════════════════════════════════════════
+#  LAYOUT: keep content above bars
+# ═════════════════════════════════════════════════════════════════════════════
+def _on_resize(event=None):
+    h        = root.winfo_height()
+    taken    = PLAYER_BAR_H + VISUALISER_H
+    content.place_configure(height=max(1, h - taken))
+
+
+root.bind("<Configure>", _on_resize)
+
 
 # ═════════════════════════════════════════════════════════════════════════════
 #  PAGE FUNCTIONS
 # ═════════════════════════════════════════════════════════════════════════════
-
-# ── Main Menu ─────────────────────────────────────────────────────────────────
 def MainMenu():
     clear_content()
     section_title("Welcome to Freeply")
@@ -134,66 +657,44 @@ def MainMenu():
               "• Contact With Me  — Get in touch with the developer.")
     body_text("Enjoy your music — for free, forever.")
 
-# ── Download ──────────────────────────────────────────────────────────────────
+
 def DownloadingMusicMenu():
     clear_content()
     section_title("Download a Song")
     body_text(
-        "Enter a YouTube URL and the desired file name below.\n"
+        "Enter a YouTube URL, the song name and the artist name below.\n"
         "The song will be downloaded as an MP3 into your Musics folder.\n"
         "Requires yt-dlp and ffmpeg to be installed on your system."
     )
 
-    # ── URL row ───────────────────────────────────────────────────────────────
-    url_frame = CTkFrame(content, fg_color=BackGroundColor, corner_radius=0)
-    url_frame.pack(anchor="w", padx=28, pady=(6, 0))
+    def _labeled_entry(label_text, placeholder):
+        row = CTkFrame(content, fg_color=BackGroundColor, corner_radius=0)
+        row.pack(anchor="w", padx=28, pady=(10, 0))
+        CTkLabel(row, text=label_text, font=BodyFont,
+                 text_color=BodyColor, fg_color=BackGroundColor,
+                 width=100, anchor="w").pack(side="left", padx=(0, 10))
+        entry = CTkEntry(row, width=380, placeholder_text=placeholder,
+                         font=BodyFont, fg_color=EntryColor,
+                         text_color=BodyColor, border_color=AccentColor)
+        entry.pack(side="left")
+        return entry
 
-    CTkLabel(
-        url_frame, text="YouTube URL:",
-        font=BodyFont, text_color=BodyColor, fg_color=BackGroundColor
-    ).pack(side="left", padx=(0, 10))
+    url_entry    = _labeled_entry("YouTube URL:", "https://www.youtube.com/watch?v=…")
+    name_entry   = _labeled_entry("Song name:  ", "e.g. Infinity Repeating")
+    artist_entry = _labeled_entry("Artist:       ", "e.g. Disclosure")
 
-    url_entry = CTkEntry(
-        url_frame, width=380, placeholder_text="https://www.youtube.com/watch?v=…",
-        font=BodyFont, fg_color=EntryColor,
-        text_color=BodyColor, border_color=AccentColor
-    )
-    url_entry.pack(side="left")
-
-    # ── Song name row ─────────────────────────────────────────────────────────
-    name_frame = CTkFrame(content, fg_color=BackGroundColor, corner_radius=0)
-    name_frame.pack(anchor="w", padx=28, pady=(10, 0))
-
-    CTkLabel(
-        name_frame, text="Song name:  ",
-        font=BodyFont, text_color=BodyColor, fg_color=BackGroundColor
-    ).pack(side="left", padx=(0, 10))
-
-    name_entry = CTkEntry(
-        name_frame, width=380, placeholder_text="e.g. My Favourite Song",
-        font=BodyFont, fg_color=EntryColor,
-        text_color=BodyColor, border_color=AccentColor
-    )
-    name_entry.pack(side="left")
-
-    # ── Status label ──────────────────────────────────────────────────────────
-    status_lbl = CTkLabel(
-        content, text="", font=SmallFont,
-        text_color=SubHeaderColor, fg_color=BackGroundColor,
-        wraplength=680, justify="left"
-    )
+    status_lbl = CTkLabel(content, text="", font=SmallFont,
+                          text_color=SubHeaderColor, fg_color=BackGroundColor,
+                          wraplength=680, justify="left")
     status_lbl.pack(anchor="w", padx=28, pady=(12, 0))
 
-    # ── Progress bar ──────────────────────────────────────────────────────────
-    progress_bar = CTkProgressBar(
-        content, width=500,
-        fg_color=EntryColor, progress_color=HeaderColor
-    )
+    progress_bar = CTkProgressBar(content, width=500,
+                                  fg_color=EntryColor, progress_color=HeaderColor)
 
     def do_download():
-        url  = url_entry.get().strip()
-        name = name_entry.get().strip()
-
+        url    = url_entry.get().strip()
+        name   = name_entry.get().strip()
+        artist = artist_entry.get().strip()
         if not url:
             status_lbl.configure(text="⚠ Please enter a YouTube URL.")
             return
@@ -201,32 +702,24 @@ def DownloadingMusicMenu():
             status_lbl.configure(text="⚠ Please enter a song name.")
             return
 
-        # Check yt-dlp is available
+        # Dosya adı: "Artist - Song name" ya da sadece "Song name"
+        file_stem    = f"{artist} - {name}" if artist else name
+        out_template = os.path.join(MUSICS_DIR, f"{file_stem}.%(ext)s")
+
         ytdlp = None
         for candidate in ("yt-dlp", "yt_dlp"):
-            if subprocess.run(
-                ["which", candidate], capture_output=True
-            ).returncode == 0:
+            if subprocess.run(["which", candidate], capture_output=True).returncode == 0:
                 ytdlp = candidate
                 break
-
         if ytdlp is None:
             status_lbl.configure(
                 text="✗ yt-dlp not found.\n"
                      "Install it with:  pip install yt-dlp\n"
-                     "and make sure ffmpeg is also installed (brew install ffmpeg)."
-            )
+                     "and make sure ffmpeg is also installed (brew install ffmpeg).")
             return
 
-        out_template = os.path.join(MUSICS_DIR, f"{name}.%(ext)s")
-        cmd = [
-            ytdlp,
-            "--extract-audio",
-            "--audio-format", "mp3",
-            "--audio-quality", "0",
-            "-o", out_template,
-            url
-        ]
+        cmd = [ytdlp, "--extract-audio", "--audio-format", "mp3",
+               "--audio-quality", "0", "-o", out_template, url]
 
         status_lbl.configure(text="⏳ Downloading… please wait.")
         progress_bar.pack(anchor="w", padx=28, pady=(8, 0))
@@ -240,27 +733,22 @@ def DownloadingMusicMenu():
             progress_bar.set(1)
             if result.returncode == 0:
                 status_lbl.configure(
-                    text=f"✓ Downloaded successfully as '{name}.mp3' in your Musics folder."
-                )
+                    text=f"✓ Downloaded successfully as '{file_stem}.mp3'.")
             else:
-                err = result.stderr.strip().splitlines()
+                err  = result.stderr.strip().splitlines()
                 last = err[-1] if err else "Unknown error."
                 status_lbl.configure(text=f"✗ Download failed:\n{last}")
             download_btn.configure(state="normal")
 
         threading.Thread(target=run, daemon=True).start()
 
-    # ── Download button ───────────────────────────────────────────────────────
     download_btn = CTkButton(
-        content, text="⬇  Download",
-        command=do_download,
+        content, text="⬇  Download", command=do_download,
         font=SubHeaderFont, fg_color=HeaderColor,
         text_color="#FFFFFF", hover_color=SubHeaderColor,
-        width=160, height=38, corner_radius=8
-    )
+        width=160, height=38, corner_radius=8)
     download_btn.pack(anchor="w", padx=28, pady=(14, 0))
 
-    # ── Install hint ──────────────────────────────────────────────────────────
     CTkLabel(
         content,
         text="Tip: install dependencies with  →  pip install yt-dlp  and  brew install ffmpeg",
@@ -268,170 +756,96 @@ def DownloadingMusicMenu():
     ).pack(anchor="w", padx=28, pady=(18, 0))
 
 
-# ── Play ──────────────────────────────────────────────────────────────────────
-_current_song_path = None
-
 def PlayingMusicMenu():
     clear_content()
     section_title("Play a Song")
-    body_text("Write the song's name (without extension) in the box below to search "
-              "and play your song from the Musics folder.")
+    body_text("Write the song's name to search. Click the result to play.")
 
-    entry_frame = CTkFrame(content, fg_color=BackGroundColor, corner_radius=0)   # noqa: F405
+    entry_frame = CTkFrame(content, fg_color=BackGroundColor, corner_radius=0)
     entry_frame.pack(anchor="w", padx=28, pady=(4, 0))
 
-    search_entry = CTkEntry(
-        entry_frame, width=360, placeholder_text="Song name…",
-        font=BodyFont,              # noqa: F405
-        fg_color=EntryColor,        # noqa: F405
-        text_color=BodyColor,       # noqa: F405
-        border_color=AccentColor    # noqa: F405
-    )
+    search_entry = CTkEntry(entry_frame, width=360,
+                            placeholder_text="Song name…",
+                            font=BodyFont, fg_color=EntryColor,
+                            text_color=BodyColor, border_color=AccentColor)
     search_entry.pack(side="left", padx=(0, 10))
 
-    status_lbl = CTkLabel(
-        content, text="", font=SmallFont,   # noqa: F405
-        text_color=SubHeaderColor,           # noqa: F405
-        fg_color=BackGroundColor             # noqa: F405
-    )
+    status_lbl = CTkLabel(content, text="", font=SmallFont,
+                          text_color=SubHeaderColor, fg_color=BackGroundColor)
+    status_lbl.pack(anchor="w", padx=28, pady=(8, 0))
 
-    def play_song():
-        global _current_song_path
-        query = search_entry.get().strip()
+    # Sonuç kartlarının yerleştirileceği alan
+    result_frame = CTkFrame(content, fg_color=BackGroundColor, corner_radius=0)
+    result_frame.pack(anchor="w", padx=28, pady=(6, 0))
+
+    def do_search():
+        # Eski sonuçları temizle
+        for w in result_frame.winfo_children():
+            w.destroy()
+
+        query     = search_entry.get().strip()
+        all_files = get_audio_files()
+
         if not query:
             status_lbl.configure(text="⚠ Please enter a song name.")
-            status_lbl.pack(anchor="w", padx=28, pady=(8, 0))
             return
 
-        # Find any matching file in MUSICS_DIR
-        found = None
-        for f in os.listdir(MUSICS_DIR):
-            name_no_ext = os.path.splitext(f)[0].lower()
-            if query.lower() in name_no_ext:
-                found = os.path.join(MUSICS_DIR, f)
-                break
+        matches = [
+            (i, fp) for i, fp in enumerate(all_files)
+            if query.lower() in os.path.splitext(os.path.basename(fp))[0].lower()
+        ]
 
-        if found is None:
-            status_lbl.configure(text=f"✗ No song matching '{query}' found in Musics folder.")
-        elif PYGAME_OK:
-            pygame.mixer.music.load(found)
-            pygame.mixer.music.play()
-            _current_song_path = found
-            status_lbl.configure(
-                text=f"▶ Now playing: {os.path.basename(found)}")
-        else:
-            # Fallback: open with the system default player
-            if sys.platform == "win32":
-                os.startfile(found)
-            elif sys.platform == "darwin":
-                subprocess.call(["open", found])
-            else:
-                subprocess.call(["xdg-open", found])
-            status_lbl.configure(
-                text=f"▶ Opened: {os.path.basename(found)} in your default player.")
-        status_lbl.pack(anchor="w", padx=28, pady=(8, 0))
+        if not matches:
+            status_lbl.configure(text=f"✗ No song matching '{query}' found.")
+            return
 
-    CTkButton(
-        entry_frame, text="Play",
-        command=play_song,
-        font=BodyFont,              # noqa: F405
-        fg_color=HeaderColor,       # noqa: F405
-        text_color="#FFFFFF",
-        hover_color=SubHeaderColor  # noqa: F405
-    ).pack(side="left")
+        status_lbl.configure(text=f"{len(matches)} result(s) — click to play:")
 
-    status_lbl  # created above; packed inside play_song()
+        def make_cmd(fp, idx):
+            def cmd():
+                play_file(fp, playlist=all_files, index=idx)
+            return cmd
 
-    # Stop button (only useful if pygame is available)
-    if PYGAME_OK:
-        def stop_song():
-            pygame.mixer.music.stop()
-            status_lbl.configure(text="⏹ Playback stopped.")
-            status_lbl.pack(anchor="w", padx=28, pady=(8, 0))
+        for idx, fp in matches:
+            song_card(result_frame, fp, on_play=make_cmd(fp, idx))
 
-        CTkButton(
-            content, text="Stop",
-            command=stop_song,
-            font=BodyFont,                  # noqa: F405
-            fg_color=ButtonColor,           # noqa: F405
-            text_color=SubHeaderColor,      # noqa: F405
-            hover_color=AccentColor,        # noqa: F405
-            width=100
-        ).pack(anchor="w", padx=28, pady=(12, 0))
+    CTkButton(entry_frame, text="Search", command=do_search,
+              font=BodyFont, fg_color=HeaderColor,
+              text_color="#FFFFFF", hover_color=SubHeaderColor).pack(side="left")
 
-# ── Playlists (stub) ──────────────────────────────────────────────────────────
+    # Enter tuşuyla da arama yapılabilsin
+    search_entry.bind("<Return>", lambda e: do_search())
+
+
 def PlaylistMenu():
     clear_content()
     section_title("Playlists")
-    body_text("Playlist management is coming in a future version of Freeply.\n"
-              "Stay tuned!")
+    body_text("Playlist management is coming in a future version of Freeply.\nStay tuned!")
 
-# ── Songs ─────────────────────────────────────────────────────────────────────
+
 def SongsMenu():
     clear_content()
     section_title("Your Songs")
-    body_text(f"Scanning: {MUSICS_DIR}")
-
-    try:
-        AUDIO_EXTS = (".mp3", ".wav", ".flac", ".aac", ".m4a", ".ogg")
-        files = [f for f in os.listdir(MUSICS_DIR)
-                 if os.path.isfile(os.path.join(MUSICS_DIR, f))
-                 and not f.startswith(".")
-                 and f.lower().endswith(AUDIO_EXTS)]
-    except FileNotFoundError:
-        files = []
-
-    if not files:
+    all_files = get_audio_files()
+    if not all_files:
         body_text("No songs found. Use the Download page to add music,\n"
                   "or copy MP3/WAV files manually into the Musics folder.")
         return
+    body_text(f"{len(all_files)} song(s)  —  click to play")
 
-    # Scrollable song list
-    scroll = CTkScrollableFrame(
-        content, fg_color=BackGroundColor,   # noqa: F405
-        scrollbar_button_color=AccentColor   # noqa: F405
-    )
-    scroll.pack(fill="both", expand=True, padx=28, pady=(0, 20))
+    scroll = CTkScrollableFrame(content, fg_color=BackGroundColor,
+                                scrollbar_button_color=AccentColor)
+    scroll.pack(fill="both", expand=True, padx=28, pady=(0, 4))
 
-    status_lbl = CTkLabel(
-        content, text="", font=SmallFont,   # noqa: F405
-        text_color=SubHeaderColor,           # noqa: F405
-        fg_color=BackGroundColor             # noqa: F405
-    )
-    status_lbl.pack(anchor="w", padx=28)
-
-    def make_play_cmd(filepath, filename):
+    def make_cmd(fp, idx):
         def cmd():
-            if PYGAME_OK:
-                pygame.mixer.music.load(filepath)
-                pygame.mixer.music.play()
-                status_lbl.configure(text=f"▶ Now playing: {filename}")
-            else:
-                if sys.platform == "win32":
-                    os.startfile(filepath)
-                elif sys.platform == "darwin":
-                    subprocess.call(["open", filepath])
-                else:
-                    subprocess.call(["xdg-open", filepath])
-                status_lbl.configure(text=f"▶ Opened: {filename}")
+            play_file(fp, playlist=all_files, index=idx)
         return cmd
 
-    for fname in sorted(files):
-        fpath = os.path.join(MUSICS_DIR, fname)
-        CTkButton(
-            scroll,
-            text=f"  ♪  {fname}",
-            command=make_play_cmd(fpath, fname),
-            font=BodyFont,                  # noqa: F405
-            text_color=SubHeaderColor,      # noqa: F405
-            fg_color=SideBarColor,          # noqa: F405
-            hover_color=ButtonColor,        # noqa: F405
-            anchor="w",
-            height=38,
-            corner_radius=8
-        ).pack(fill="x", pady=3)
+    for idx, fp in enumerate(all_files):
+        song_card(scroll, fp, on_play=make_cmd(fp, idx))
 
-# ── Settings ───────────────────────────────────────────────────────────────────
+
 def SettingsPage():
     set_path = os.path.join(BASE_DIR, "SetSettings.py")
     if os.path.exists(set_path):
@@ -441,29 +855,25 @@ def SettingsPage():
         section_title("Settings")
         body_text("SetSettings.py not found next to Freeply.py.")
 
-# ── GitHub ────────────────────────────────────────────────────────────────────
+
 def GitHubPage():
     webbrowser.open("https://github.com/feriduntahakurt0")
 
-# ── GNU License ───────────────────────────────────────────────────────────────
+
 def GnuLicensePage():
     webbrowser.open("https://www.gnu.org/licenses/gpl-3.0.html")
 
-# ── Contact ───────────────────────────────────────────────────────────────────
+
 def ContactPage():
     clear_content()
     section_title("Contact With Me")
-    body_text("Have a question, a bug report, or just want to say hello?\n"
-              "Feel free to reach out:")
-    CTkLabel(
-        content,
-        text="📧  feriduntahakurt@gmail.com",
-        font=SubHeaderFont,        # noqa: F405
-        text_color=HeaderColor,    # noqa: F405
-        fg_color=BackGroundColor,  # noqa: F405
-        anchor="w"
-    ).pack(anchor="w", padx=28, pady=(4, 0))
+    body_text("Have a question, a bug report, or just want to say hello?\nFeel free to reach out:")
+    CTkLabel(content, text="📧  feriduntahakurt@gmail.com",
+             font=SubHeaderFont, text_color=HeaderColor,
+             fg_color=BackGroundColor, anchor="w"
+             ).pack(anchor="w", padx=28, pady=(4, 0))
     body_text("\nI try to reply within a few days.", pady=(12, 0))
+
 
 # ═════════════════════════════════════════════════════════════════════════════
 #  SIDEBAR BUTTONS
@@ -479,27 +889,17 @@ _NAV_BUTTONS = [
     ("✉  Contact With Me", ContactPage),
 ]
 
-def make_nav_cmd(fn):
-    def cmd():
-        fn()
-    return cmd
-
 for label, fn in _NAV_BUTTONS:
     CTkButton(
-        sidebar,
-        text=label,
-        command=make_nav_cmd(fn),
-        font=SubHeaderFont,         # noqa: F405
-        text_color=SubHeaderColor,  # noqa: F405
-        fg_color=SideBarColor,      # noqa: F405
-        hover_color=ButtonColor,    # noqa: F405
-        anchor="w",
-        height=40,
-        corner_radius=8
-    ).pack(fill="x", padx=emptyBetweenCorner, pady=3)   # noqa: F405
+        sidebar, text=label, command=fn,
+        font=SubHeaderFont, text_color=SubHeaderColor,
+        fg_color=SideBarColor, hover_color=ButtonColor,
+        anchor="w", height=40, corner_radius=8
+    ).pack(fill="x", padx=emptyBetweenCorner, pady=3)
+
 
 # ═════════════════════════════════════════════════════════════════════════════
-#  LAUNCH — show Main Menu on start
+#  LAUNCH
 # ═════════════════════════════════════════════════════════════════════════════
 MainMenu()
 root.mainloop()
