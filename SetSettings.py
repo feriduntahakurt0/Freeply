@@ -1,6 +1,8 @@
 """
 SetSettings.py — Freeply Theme & Settings Editor
 Opens as a standalone window; reads and rewrites Settings/settings.py
+
+Do Manual Changes If Only You Know What You Are Doing!
 """
 
 import os
