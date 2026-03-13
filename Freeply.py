@@ -8,8 +8,6 @@ Folder layout expected:
   Settings/
       settings.py
   Musics/          ← MP3 files live here
-
-  Do Manual Changes If Only You Know What You Are Doing!
 """
 
 import os
@@ -375,8 +373,11 @@ def SongsMenu():
     body_text(f"Scanning: {MUSICS_DIR}")
 
     try:
+        AUDIO_EXTS = (".mp3", ".wav", ".flac", ".aac", ".m4a", ".ogg")
         files = [f for f in os.listdir(MUSICS_DIR)
-                 if os.path.isfile(os.path.join(MUSICS_DIR, f))]
+                 if os.path.isfile(os.path.join(MUSICS_DIR, f))
+                 and not f.startswith(".")
+                 and f.lower().endswith(AUDIO_EXTS)]
     except FileNotFoundError:
         files = []
 
