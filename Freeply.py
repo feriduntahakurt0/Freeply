@@ -8,6 +8,8 @@ Folder layout expected:
   Settings/
       settings.py
   Musics/          ← MP3 files live here
+
+  Do Manual Changes If Only You Know What You Are Doing!
 """
 
 import os
