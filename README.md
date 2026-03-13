@@ -29,10 +29,11 @@ Before running Freeply, ensure you have Python installed on your system.
     ```
 
 2.  **Install dependencies:**
-    *(Note: Replace with your actual library, e.g., pygame, tkinter, or playsound)*
     ```bash
+    pip install numpt
     pip install pygame
     pip install ytd-lib
+    pip install mutagen
     pip install customtkinter
     ```
 
