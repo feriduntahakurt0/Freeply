@@ -31,20 +31,23 @@ Before running Freeply, ensure you have Python installed on your system.
 2.  **Install dependencies:**
     *(Note: Replace with your actual library, e.g., pygame, tkinter, or playsound)*
     ```bash
-    pip install -r requirements.txt
+    pip install pygame
+    pip install ytd-lib
+    pip install customtkinter
     ```
 
 3.  **Run the application:**
     ```bash
-    python main.py
+    python Freeply.py
     ```
 
 ## 📂 Project Structure
 
 ```text
 Freeply/
-├── assets/          # Icons, images, and UI elements
-├── src/             # Source code files
-├── songs/           # Place your music files here
-├── main.py          # Application entry point
-└── README.md        # Project documentation
+├── Musics/                    # Musics downloaded / added
+├── Settings/                  # Settings for application
+    ├── settings.py/           # Variables for application
+├── Freeply.py                 # Application entry point
+├── SetSettings.py             # Settings changer
+└── README.md                  # Project documentation
