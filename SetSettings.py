@@ -1,171 +1,215 @@
-"""
-SetSettings.py — Freeply Theme & Settings Editor
-Opens as a standalone window; reads and rewrites Settings/settings.py
+# ============================================================
+#  Freeply 1.0.0 — Settings File
+# ============================================================
 
-Do Manual Changes If Only You Know What You Are Doing!
-"""
+# Defaults
+windowSize = "1100x680"
+version    = "1.0.0"
+emptyBetweenCorner = 15
+emptyBetweenTexts  = 8
 
-import os
-import re
-import sys
-from customtkinter import *
+# Fonts
+HeaderFont    = ("Arial", 22, "bold")
+SubHeaderFont = ("Arial", 15, "bold")
+BodyFont      = ("Arial", 13)
+SmallFont     = ("Arial", 11)
 
-# ── Resolve paths ─────────────────────────────────────────────────────────────
-BASE_DIR      = os.path.dirname(os.path.abspath(__file__))
-SETTINGS_FILE = os.path.join(BASE_DIR, "Settings", "settings.py")
+# ============================================================
+#  Themes
+# ============================================================
 
-sys.path.insert(0, os.path.join(BASE_DIR, "Settings"))
-from settings import *          # noqa: F403, E402  (pull current values)
+# ── Grape ────────────────────────────────────────────────────
+GrapeTheme_BackGroundColor  = "#F5EEF8"
+GrapeTheme_SideBarColor     = "#EAD7F2"
+GrapeTheme_HeaderColor      = "#6A0572"
+GrapeTheme_SubHeaderColor   = "#8E44AD"
+GrapeTheme_ButtonColor      = "#D7BDE2"
+GrapeTheme_EntryColor       = "#F2E6FA"
+GrapeTheme_BodyColor        = "#5D3472"
+GrapeTheme_AccentColor      = "#C39BD3"
+GrapeTheme_PlayerBarColor   = "#B57EC0"
 
-# ── Read the current Theme from file ──────────────────────────────────────────
-def read_current_theme():
-    with open(SETTINGS_FILE, "r", encoding="utf-8") as f:
-        for line in f:
-            m = re.match(r'^Theme\s*=\s*["\'](\w+)["\']', line.strip())
-            if m:
-                return m.group(1)
-    return "Grape"
+# ── Midnight ─────────────────────────────────────────────────
+MidnightTheme_BackGroundColor  = "#0D0D1A"
+MidnightTheme_SideBarColor     = "#12122B"
+MidnightTheme_HeaderColor      = "#7EB8FF"
+MidnightTheme_SubHeaderColor   = "#A0CFFF"
+MidnightTheme_ButtonColor      = "#1E2040"
+MidnightTheme_EntryColor       = "#1A1A35"
+MidnightTheme_BodyColor        = "#C8D8F0"
+MidnightTheme_AccentColor      = "#3A4080"
+MidnightTheme_PlayerBarColor   = "#0A0A1F"
 
-# ── Write a new Theme value into the file ─────────────────────────────────────
-def write_theme(new_theme: str):
-    with open(SETTINGS_FILE, "r", encoding="utf-8") as f:
-        content = f.read()
-    content = re.sub(
-        r'^(Theme\s*=\s*)["\'](\w+)["\']',
-        lambda m: f'{m.group(1)}"{new_theme}"',
-        content,
-        flags=re.MULTILINE
-    )
-    with open(SETTINGS_FILE, "w", encoding="utf-8") as f:
-        f.write(content)
+# ── Forest ───────────────────────────────────────────────────
+ForestTheme_BackGroundColor  = "#F0F7F0"
+ForestTheme_SideBarColor     = "#D8EDD8"
+ForestTheme_HeaderColor      = "#1B4D2E"
+ForestTheme_SubHeaderColor   = "#2E7D50"
+ForestTheme_ButtonColor      = "#A8D5A2"
+ForestTheme_EntryColor       = "#E8F5E8"
+ForestTheme_BodyColor        = "#2C5F3A"
+ForestTheme_AccentColor      = "#5CB87A"
+ForestTheme_PlayerBarColor   = "#A0C8A0"
 
-# ── Available themes ──────────────────────────────────────────────────────────
-THEMES = ["Grape", "Midnight", "Forest", "Sunset", "Arctic", "Rose", "Charcoal", "Gold"]
+# ── Sunset ───────────────────────────────────────────────────
+SunsetTheme_BackGroundColor  = "#FFF4EC"
+SunsetTheme_SideBarColor     = "#FFE0C8"
+SunsetTheme_HeaderColor      = "#C0392B"
+SunsetTheme_SubHeaderColor   = "#E67E22"
+SunsetTheme_ButtonColor      = "#F5CBA7"
+SunsetTheme_EntryColor       = "#FEF0E7"
+SunsetTheme_BodyColor        = "#A04000"
+SunsetTheme_AccentColor      = "#F0A070"
+SunsetTheme_PlayerBarColor   = "#F0B080"
 
-THEME_PREVIEWS = {
-    "Grape":    ("#F5EEF8", "#6A0572"),
-    "Midnight": ("#0D0D1A", "#7EB8FF"),
-    "Forest":   ("#F0F7F0", "#1B4D2E"),
-    "Sunset":   ("#FFF4EC", "#C0392B"),
-    "Arctic":   ("#EAF4FB", "#1A5276"),
-    "Rose":     ("#FFF0F3", "#880E2F"),
-    "Charcoal": ("#2B2B2B", "#E0E0E0"),
-    "Gold":     ("#FFFBF0", "#7D5A00"),
-}
+# ── Arctic ───────────────────────────────────────────────────
+ArcticTheme_BackGroundColor  = "#EAF4FB"
+ArcticTheme_SideBarColor     = "#D6EAF8"
+ArcticTheme_HeaderColor      = "#1A5276"
+ArcticTheme_SubHeaderColor   = "#2980B9"
+ArcticTheme_ButtonColor      = "#AED6F1"
+ArcticTheme_EntryColor       = "#EBF5FB"
+ArcticTheme_BodyColor        = "#154360"
+ArcticTheme_AccentColor      = "#85C1E9"
+ArcticTheme_PlayerBarColor   = "#A0C8E8"
 
-# ── App setup ─────────────────────────────────────────────────────────────────
-set_appearance_mode("light")
-set_default_color_theme("blue")
+# ── Rose ─────────────────────────────────────────────────────
+RoseTheme_BackGroundColor  = "#FFF0F3"
+RoseTheme_SideBarColor     = "#FFD6DE"
+RoseTheme_HeaderColor      = "#880E2F"
+RoseTheme_SubHeaderColor   = "#C0395A"
+RoseTheme_ButtonColor      = "#F5A8BB"
+RoseTheme_EntryColor       = "#FFECF0"
+RoseTheme_BodyColor        = "#7B1535"
+RoseTheme_AccentColor      = "#F08098"
+RoseTheme_PlayerBarColor   = "#F0A0B8"
 
-root = CTk()
-root.title("Freeply — Settings")
-root.geometry("640x520")
-root.resizable(False, False)
-root.configure(fg_color=BackGroundColor)   # noqa: F405
+# ── Charcoal ─────────────────────────────────────────────────
+CharcoalTheme_BackGroundColor  = "#2B2B2B"
+CharcoalTheme_SideBarColor     = "#1F1F1F"
+CharcoalTheme_HeaderColor      = "#E0E0E0"
+CharcoalTheme_SubHeaderColor   = "#BDBDBD"
+CharcoalTheme_ButtonColor      = "#3D3D3D"
+CharcoalTheme_EntryColor       = "#333333"
+CharcoalTheme_BodyColor        = "#9E9E9E"
+CharcoalTheme_AccentColor      = "#555555"
+CharcoalTheme_PlayerBarColor   = "#111111"
 
-# ── Header ────────────────────────────────────────────────────────────────────
-header_frame = CTkFrame(root, fg_color=SideBarColor, corner_radius=0)   # noqa: F405
-header_frame.pack(fill="x", padx=0, pady=0)
+# ── Gold ─────────────────────────────────────────────────────
+GoldTheme_BackGroundColor  = "#FFFBF0"
+GoldTheme_SideBarColor     = "#FFF2C8"
+GoldTheme_HeaderColor      = "#7D5A00"
+GoldTheme_SubHeaderColor   = "#B8860B"
+GoldTheme_ButtonColor      = "#FFE08A"
+GoldTheme_EntryColor       = "#FFFAEB"
+GoldTheme_BodyColor        = "#5C4000"
+GoldTheme_AccentColor      = "#D4A017"
+GoldTheme_PlayerBarColor   = "#F0D060"
 
-CTkLabel(
-    header_frame,
-    text=f"Freeply {version} — Settings",   # noqa: F405
-    font=HeaderFont,                         # noqa: F405
-    text_color=HeaderColor                   # noqa: F405
-).pack(pady=18, padx=20, anchor="w")
+# ============================================================
+#  Active Theme Selection
+# ============================================================
 
-# ── Subtitle ──────────────────────────────────────────────────────────────────
-CTkLabel(
-    root,
-    text="Choose a colour theme for Freeply:",
-    font=SubHeaderFont,        # noqa: F405
-    text_color=SubHeaderColor, # noqa: F405
-    fg_color=BackGroundColor   # noqa: F405
-).pack(anchor="w", padx=24, pady=(20, 8))
+# Change this value to switch themes:
+# "Grape" | "Midnight" | "Forest" | "Sunset" | "Arctic" | "Rose" | "Charcoal" | "Gold"
+Theme = "Midnight"
 
-# ── Theme selection variable ──────────────────────────────────────────────────
-selected_theme = StringVar(value=read_current_theme())
+BackGroundColor  = ""
+SideBarColor     = ""
+HeaderColor      = ""
+SubHeaderColor   = ""
+ButtonColor      = ""
+EntryColor       = ""
+BodyColor        = ""
+AccentColor      = ""
+PlayerBarColor   = ""
 
-# ── Theme grid ────────────────────────────────────────────────────────────────
-grid_frame = CTkFrame(root, fg_color=BackGroundColor, corner_radius=0)  # noqa: F405
-grid_frame.pack(padx=24, pady=4, fill="x")
+# ── Theme Settings ───────────────────────────────────────────
 
-def make_theme_card(parent, theme_name, row, col):
-    bg, fg = THEME_PREVIEWS[theme_name]
+if Theme == "Grape":
+    BackGroundColor = GrapeTheme_BackGroundColor
+    SideBarColor    = GrapeTheme_SideBarColor
+    HeaderColor     = GrapeTheme_HeaderColor
+    SubHeaderColor  = GrapeTheme_SubHeaderColor
+    ButtonColor     = GrapeTheme_ButtonColor
+    EntryColor      = GrapeTheme_EntryColor
+    BodyColor       = GrapeTheme_BodyColor
+    AccentColor     = GrapeTheme_AccentColor
+    PlayerBarColor  = GrapeTheme_PlayerBarColor
 
-    card = CTkFrame(parent, fg_color=bg, corner_radius=12, width=130, height=80)
-    card.grid(row=row, column=col, padx=8, pady=8, sticky="nsew")
-    card.grid_propagate(False)
+elif Theme == "Midnight":
+    BackGroundColor = MidnightTheme_BackGroundColor
+    SideBarColor    = MidnightTheme_SideBarColor
+    HeaderColor     = MidnightTheme_HeaderColor
+    SubHeaderColor  = MidnightTheme_SubHeaderColor
+    ButtonColor     = MidnightTheme_ButtonColor
+    EntryColor      = MidnightTheme_EntryColor
+    BodyColor       = MidnightTheme_BodyColor
+    AccentColor     = MidnightTheme_AccentColor
+    PlayerBarColor  = MidnightTheme_PlayerBarColor
 
-    label = CTkLabel(card, text=theme_name, font=BodyFont,   # noqa: F405
-                     text_color=fg, fg_color=bg)
-    label.place(relx=0.5, rely=0.38, anchor="center")
+elif Theme == "Forest":
+    BackGroundColor = ForestTheme_BackGroundColor
+    SideBarColor    = ForestTheme_SideBarColor
+    HeaderColor     = ForestTheme_HeaderColor
+    SubHeaderColor  = ForestTheme_SubHeaderColor
+    ButtonColor     = ForestTheme_ButtonColor
+    EntryColor      = ForestTheme_EntryColor
+    BodyColor       = ForestTheme_BodyColor
+    AccentColor     = ForestTheme_AccentColor
+    PlayerBarColor  = ForestTheme_PlayerBarColor
 
-    rb = CTkRadioButton(
-        card,
-        text="",
-        variable=selected_theme,
-        value=theme_name,
-        fg_color=fg,
-        border_color=fg,
-        hover_color=fg
-    )
-    rb.place(relx=0.5, rely=0.72, anchor="center")
+elif Theme == "Sunset":
+    BackGroundColor = SunsetTheme_BackGroundColor
+    SideBarColor    = SunsetTheme_SideBarColor
+    HeaderColor     = SunsetTheme_HeaderColor
+    SubHeaderColor  = SunsetTheme_SubHeaderColor
+    ButtonColor     = SunsetTheme_ButtonColor
+    EntryColor      = SunsetTheme_EntryColor
+    BodyColor       = SunsetTheme_BodyColor
+    AccentColor     = SunsetTheme_AccentColor
+    PlayerBarColor  = SunsetTheme_PlayerBarColor
 
-for i, name in enumerate(THEMES):
-    make_theme_card(grid_frame, name, row=i // 4, col=i % 4)
+elif Theme == "Arctic":
+    BackGroundColor = ArcticTheme_BackGroundColor
+    SideBarColor    = ArcticTheme_SideBarColor
+    HeaderColor     = ArcticTheme_HeaderColor
+    SubHeaderColor  = ArcticTheme_SubHeaderColor
+    ButtonColor     = ArcticTheme_ButtonColor
+    EntryColor      = ArcticTheme_EntryColor
+    BodyColor       = ArcticTheme_BodyColor
+    AccentColor     = ArcticTheme_AccentColor
+    PlayerBarColor  = ArcticTheme_PlayerBarColor
 
-for c in range(4):
-    grid_frame.columnconfigure(c, weight=1)
+elif Theme == "Rose":
+    BackGroundColor = RoseTheme_BackGroundColor
+    SideBarColor    = RoseTheme_SideBarColor
+    HeaderColor     = RoseTheme_HeaderColor
+    SubHeaderColor  = RoseTheme_SubHeaderColor
+    ButtonColor     = RoseTheme_ButtonColor
+    EntryColor      = RoseTheme_EntryColor
+    BodyColor       = RoseTheme_BodyColor
+    AccentColor     = RoseTheme_AccentColor
+    PlayerBarColor  = RoseTheme_PlayerBarColor
 
-# ── Font size note ────────────────────────────────────────────────────────────
-CTkLabel(
-    root,
-    text="Font size and spacing are managed directly in Settings/settings.py.",
-    font=SmallFont,          # noqa: F405
-    text_color=BodyColor,    # noqa: F405
-    fg_color=BackGroundColor # noqa: F405
-).pack(anchor="w", padx=24, pady=(8, 0))
+elif Theme == "Charcoal":
+    BackGroundColor = CharcoalTheme_BackGroundColor
+    SideBarColor    = CharcoalTheme_SideBarColor
+    HeaderColor     = CharcoalTheme_HeaderColor
+    SubHeaderColor  = CharcoalTheme_SubHeaderColor
+    ButtonColor     = CharcoalTheme_ButtonColor
+    EntryColor      = CharcoalTheme_EntryColor
+    BodyColor       = CharcoalTheme_BodyColor
+    AccentColor     = CharcoalTheme_AccentColor
+    PlayerBarColor  = CharcoalTheme_PlayerBarColor
 
-# ── Save / Cancel ─────────────────────────────────────────────────────────────
-btn_frame = CTkFrame(root, fg_color=BackGroundColor, corner_radius=0)  # noqa: F405
-btn_frame.pack(fill="x", padx=24, pady=20)
-
-status_label = CTkLabel(
-    btn_frame, text="", font=SmallFont,   # noqa: F405
-    text_color=SubHeaderColor,            # noqa: F405
-    fg_color=BackGroundColor              # noqa: F405
-)
-status_label.pack(side="left")
-
-def save_settings():
-    new = selected_theme.get()
-    write_theme(new)
-    status_label.configure(
-        text=f"✓ Theme saved as '{new}'. Restart Freeply to apply."
-    )
-
-def cancel():
-    root.destroy()
-
-CTkButton(
-    btn_frame, text="Cancel",
-    command=cancel,
-    font=BodyFont,                 # noqa: F405
-    fg_color=ButtonColor,          # noqa: F405
-    text_color=SubHeaderColor,     # noqa: F405
-    hover_color=AccentColor,       # noqa: F405
-    width=110
-).pack(side="right", padx=(6, 0))
-
-CTkButton(
-    btn_frame, text="Save",
-    command=save_settings,
-    font=BodyFont,                 # noqa: F405
-    fg_color=HeaderColor,          # noqa: F405
-    text_color="#FFFFFF",
-    hover_color=SubHeaderColor,    # noqa: F405
-    width=110
-).pack(side="right")
-
-root.mainloop()
+elif Theme == "Gold":
+    BackGroundColor = GoldTheme_BackGroundColor
+    SideBarColor    = GoldTheme_SideBarColor
+    HeaderColor     = GoldTheme_HeaderColor
+    SubHeaderColor  = GoldTheme_SubHeaderColor
+    ButtonColor     = GoldTheme_ButtonColor
+    EntryColor      = GoldTheme_EntryColor
+    BodyColor       = GoldTheme_BodyColor
+    AccentColor     = GoldTheme_AccentColor
+    PlayerBarColor  = GoldTheme_PlayerBarColor
