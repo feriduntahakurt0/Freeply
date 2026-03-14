@@ -1,7 +1,6 @@
 # ============================================================
 #  Freeply 1.0.0 — Settings File
 # ============================================================
-# Do manual changes if only you know what you are doing!
 
 # Defaults
 windowSize = "1100x680"
@@ -28,6 +27,7 @@ GrapeTheme_ButtonColor      = "#D7BDE2"
 GrapeTheme_EntryColor       = "#F2E6FA"
 GrapeTheme_BodyColor        = "#5D3472"
 GrapeTheme_AccentColor      = "#C39BD3"
+GrapeTheme_PlayerBarColor   = "#B57EC0"
 
 # ── Midnight ─────────────────────────────────────────────────
 MidnightTheme_BackGroundColor  = "#0D0D1A"
@@ -38,6 +38,7 @@ MidnightTheme_ButtonColor      = "#1E2040"
 MidnightTheme_EntryColor       = "#1A1A35"
 MidnightTheme_BodyColor        = "#C8D8F0"
 MidnightTheme_AccentColor      = "#3A4080"
+MidnightTheme_PlayerBarColor   = "#0A0A1F"
 
 # ── Forest ───────────────────────────────────────────────────
 ForestTheme_BackGroundColor  = "#F0F7F0"
@@ -48,6 +49,7 @@ ForestTheme_ButtonColor      = "#A8D5A2"
 ForestTheme_EntryColor       = "#E8F5E8"
 ForestTheme_BodyColor        = "#2C5F3A"
 ForestTheme_AccentColor      = "#5CB87A"
+ForestTheme_PlayerBarColor   = "#A0C8A0"
 
 # ── Sunset ───────────────────────────────────────────────────
 SunsetTheme_BackGroundColor  = "#FFF4EC"
@@ -58,6 +60,7 @@ SunsetTheme_ButtonColor      = "#F5CBA7"
 SunsetTheme_EntryColor       = "#FEF0E7"
 SunsetTheme_BodyColor        = "#A04000"
 SunsetTheme_AccentColor      = "#F0A070"
+SunsetTheme_PlayerBarColor   = "#F0B080"
 
 # ── Arctic ───────────────────────────────────────────────────
 ArcticTheme_BackGroundColor  = "#EAF4FB"
@@ -68,6 +71,7 @@ ArcticTheme_ButtonColor      = "#AED6F1"
 ArcticTheme_EntryColor       = "#EBF5FB"
 ArcticTheme_BodyColor        = "#154360"
 ArcticTheme_AccentColor      = "#85C1E9"
+ArcticTheme_PlayerBarColor   = "#A0C8E8"
 
 # ── Rose ─────────────────────────────────────────────────────
 RoseTheme_BackGroundColor  = "#FFF0F3"
@@ -78,6 +82,7 @@ RoseTheme_ButtonColor      = "#F5A8BB"
 RoseTheme_EntryColor       = "#FFECF0"
 RoseTheme_BodyColor        = "#7B1535"
 RoseTheme_AccentColor      = "#F08098"
+RoseTheme_PlayerBarColor   = "#F0A0B8"
 
 # ── Charcoal ─────────────────────────────────────────────────
 CharcoalTheme_BackGroundColor  = "#2B2B2B"
@@ -88,6 +93,7 @@ CharcoalTheme_ButtonColor      = "#3D3D3D"
 CharcoalTheme_EntryColor       = "#333333"
 CharcoalTheme_BodyColor        = "#9E9E9E"
 CharcoalTheme_AccentColor      = "#555555"
+CharcoalTheme_PlayerBarColor   = "#111111"
 
 # ── Gold ─────────────────────────────────────────────────────
 GoldTheme_BackGroundColor  = "#FFFBF0"
@@ -98,6 +104,7 @@ GoldTheme_ButtonColor      = "#FFE08A"
 GoldTheme_EntryColor       = "#FFFAEB"
 GoldTheme_BodyColor        = "#5C4000"
 GoldTheme_AccentColor      = "#D4A017"
+GoldTheme_PlayerBarColor   = "#F0D060"
 
 # ============================================================
 #  Active Theme Selection
@@ -105,16 +112,17 @@ GoldTheme_AccentColor      = "#D4A017"
 
 # Change this value to switch themes:
 # "Grape" | "Midnight" | "Forest" | "Sunset" | "Arctic" | "Rose" | "Charcoal" | "Gold"
-Theme = "Charcoal"
+Theme = "Midnight"
 
-BackGroundColor = ""
-SideBarColor    = ""
-HeaderColor     = ""
-SubHeaderColor  = ""
-ButtonColor     = ""
-EntryColor      = ""
-BodyColor       = ""
-AccentColor     = ""
+BackGroundColor  = ""
+SideBarColor     = ""
+HeaderColor      = ""
+SubHeaderColor   = ""
+ButtonColor      = ""
+EntryColor       = ""
+BodyColor        = ""
+AccentColor      = ""
+PlayerBarColor   = ""
 
 # ── Theme Settings ───────────────────────────────────────────
 
@@ -127,6 +135,7 @@ if Theme == "Grape":
     EntryColor      = GrapeTheme_EntryColor
     BodyColor       = GrapeTheme_BodyColor
     AccentColor     = GrapeTheme_AccentColor
+    PlayerBarColor  = GrapeTheme_PlayerBarColor
 
 elif Theme == "Midnight":
     BackGroundColor = MidnightTheme_BackGroundColor
@@ -137,6 +146,7 @@ elif Theme == "Midnight":
     EntryColor      = MidnightTheme_EntryColor
     BodyColor       = MidnightTheme_BodyColor
     AccentColor     = MidnightTheme_AccentColor
+    PlayerBarColor  = MidnightTheme_PlayerBarColor
 
 elif Theme == "Forest":
     BackGroundColor = ForestTheme_BackGroundColor
@@ -147,6 +157,7 @@ elif Theme == "Forest":
     EntryColor      = ForestTheme_EntryColor
     BodyColor       = ForestTheme_BodyColor
     AccentColor     = ForestTheme_AccentColor
+    PlayerBarColor  = ForestTheme_PlayerBarColor
 
 elif Theme == "Sunset":
     BackGroundColor = SunsetTheme_BackGroundColor
@@ -157,6 +168,7 @@ elif Theme == "Sunset":
     EntryColor      = SunsetTheme_EntryColor
     BodyColor       = SunsetTheme_BodyColor
     AccentColor     = SunsetTheme_AccentColor
+    PlayerBarColor  = SunsetTheme_PlayerBarColor
 
 elif Theme == "Arctic":
     BackGroundColor = ArcticTheme_BackGroundColor
@@ -167,6 +179,7 @@ elif Theme == "Arctic":
     EntryColor      = ArcticTheme_EntryColor
     BodyColor       = ArcticTheme_BodyColor
     AccentColor     = ArcticTheme_AccentColor
+    PlayerBarColor  = ArcticTheme_PlayerBarColor
 
 elif Theme == "Rose":
     BackGroundColor = RoseTheme_BackGroundColor
@@ -177,6 +190,7 @@ elif Theme == "Rose":
     EntryColor      = RoseTheme_EntryColor
     BodyColor       = RoseTheme_BodyColor
     AccentColor     = RoseTheme_AccentColor
+    PlayerBarColor  = RoseTheme_PlayerBarColor
 
 elif Theme == "Charcoal":
     BackGroundColor = CharcoalTheme_BackGroundColor
@@ -187,6 +201,7 @@ elif Theme == "Charcoal":
     EntryColor      = CharcoalTheme_EntryColor
     BodyColor       = CharcoalTheme_BodyColor
     AccentColor     = CharcoalTheme_AccentColor
+    PlayerBarColor  = CharcoalTheme_PlayerBarColor
 
 elif Theme == "Gold":
     BackGroundColor = GoldTheme_BackGroundColor
@@ -197,3 +212,4 @@ elif Theme == "Gold":
     EntryColor      = GoldTheme_EntryColor
     BodyColor       = GoldTheme_BodyColor
     AccentColor     = GoldTheme_AccentColor
+    PlayerBarColor  = GoldTheme_PlayerBarColor
