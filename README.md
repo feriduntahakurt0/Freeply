@@ -30,9 +30,9 @@ Before running Freeply, ensure you have Python installed on your system.
 
 2.  **Install dependencies:**
     ```bash
-    pip install numpt
+    pip install numpy
     pip install pygame
-    pip install ytd-lib
+    pip install yt-dlp
     pip install mutagen
     pip install customtkinter
     pip install pydub --break-system-packages
