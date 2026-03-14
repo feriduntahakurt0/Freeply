@@ -1,9 +1,10 @@
 # ============================================================
 #  Freeply 1.0.0 — Settings File
 # ============================================================
+# Do Manual Changes If Only You Know What You Are Doing!
 
 # Defaults
-windowSize = "1100x680"
+windowSize = "1400x700"
 version    = "1.0.0"
 emptyBetweenCorner = 15
 emptyBetweenTexts  = 8
@@ -106,13 +107,35 @@ GoldTheme_BodyColor        = "#5C4000"
 GoldTheme_AccentColor      = "#D4A017"
 GoldTheme_PlayerBarColor   = "#F0D060"
 
+# ── Crimson (Siyah & Kırmızı) ────────────────────────────────
+CrimsonTheme_BackGroundColor  = "#0A0A0A"
+CrimsonTheme_SideBarColor     = "#140808"
+CrimsonTheme_HeaderColor      = "#E8000A"
+CrimsonTheme_SubHeaderColor   = "#FF4040"
+CrimsonTheme_ButtonColor      = "#2A0808"
+CrimsonTheme_EntryColor       = "#1A0505"
+CrimsonTheme_BodyColor        = "#FF8080"
+CrimsonTheme_AccentColor      = "#8B0000"
+CrimsonTheme_PlayerBarColor   = "#200505"
+
+# ── Ember (Siyah & Turuncu) ───────────────────────────────────
+EmberTheme_BackGroundColor  = "#0C0C0A"
+EmberTheme_SideBarColor     = "#161008"
+EmberTheme_HeaderColor      = "#FF6A00"
+EmberTheme_SubHeaderColor   = "#FF9640"
+EmberTheme_ButtonColor      = "#2A1A00"
+EmberTheme_EntryColor       = "#1A1000"
+EmberTheme_BodyColor        = "#FFB870"
+EmberTheme_AccentColor      = "#8B3A00"
+EmberTheme_PlayerBarColor   = "#1E1000"
+
 # ============================================================
 #  Active Theme Selection
 # ============================================================
 
 # Change this value to switch themes:
-# "Grape" | "Midnight" | "Forest" | "Sunset" | "Arctic" | "Rose" | "Charcoal" | "Gold"
-Theme = "Midnight"
+# "Grape" | "Midnight" | "Forest" | "Sunset" | "Arctic" | "Rose" | "Charcoal" | "Gold" | "Crimson" | "Ember"
+Theme = "Ember"
 
 BackGroundColor  = ""
 SideBarColor     = ""
@@ -213,3 +236,25 @@ elif Theme == "Gold":
     BodyColor       = GoldTheme_BodyColor
     AccentColor     = GoldTheme_AccentColor
     PlayerBarColor  = GoldTheme_PlayerBarColor
+
+elif Theme == "Crimson":
+    BackGroundColor = CrimsonTheme_BackGroundColor
+    SideBarColor    = CrimsonTheme_SideBarColor
+    HeaderColor     = CrimsonTheme_HeaderColor
+    SubHeaderColor  = CrimsonTheme_SubHeaderColor
+    ButtonColor     = CrimsonTheme_ButtonColor
+    EntryColor      = CrimsonTheme_EntryColor
+    BodyColor       = CrimsonTheme_BodyColor
+    AccentColor     = CrimsonTheme_AccentColor
+    PlayerBarColor  = CrimsonTheme_PlayerBarColor
+
+elif Theme == "Ember":
+    BackGroundColor = EmberTheme_BackGroundColor
+    SideBarColor    = EmberTheme_SideBarColor
+    HeaderColor     = EmberTheme_HeaderColor
+    SubHeaderColor  = EmberTheme_SubHeaderColor
+    ButtonColor     = EmberTheme_ButtonColor
+    EntryColor      = EmberTheme_EntryColor
+    BodyColor       = EmberTheme_BodyColor
+    AccentColor     = EmberTheme_AccentColor
+    PlayerBarColor  = EmberTheme_PlayerBarColor
