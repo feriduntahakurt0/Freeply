@@ -38,7 +38,7 @@ def write_theme(new_theme: str):
         f.write(content)
 
 # ── Available themes ──────────────────────────────────────────────────────────
-THEMES = ["Grape", "Midnight", "Forest", "Sunset", "Arctic", "Rose", "Charcoal", "Gold"]
+THEMES = ["Grape", "Midnight", "Forest", "Sunset", "Arctic", "Rose", "Charcoal", "Gold", "Crimson", "Ember"]
 
 THEME_PREVIEWS = {
     "Grape":    ("#F5EEF8", "#6A0572"),
@@ -49,6 +49,8 @@ THEME_PREVIEWS = {
     "Rose":     ("#FFF0F3", "#880E2F"),
     "Charcoal": ("#2B2B2B", "#E0E0E0"),
     "Gold":     ("#FFFBF0", "#7D5A00"),
+    "Crimson":  ("#0A0A0A", "#E8000A"),
+    "Ember":    ("#0C0C0A", "#FF6A00"),
 }
 
 # ── App setup ─────────────────────────────────────────────────────────────────
@@ -111,9 +113,9 @@ def make_theme_card(parent, theme_name, row, col):
     rb.place(relx=0.5, rely=0.72, anchor="center")
 
 for i, name in enumerate(THEMES):
-    make_theme_card(grid_frame, name, row=i // 4, col=i % 4)
+    make_theme_card(grid_frame, name, row=i // 5, col=i % 5)
 
-for c in range(4):
+for c in range(5):
     grid_frame.columnconfigure(c, weight=1)
 
 # ── Font size note ────────────────────────────────────────────────────────────
