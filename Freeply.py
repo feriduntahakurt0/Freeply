@@ -62,6 +62,9 @@ _is_playing    = False
 _song_length   = 0.0
 _seek_dragging = False
 _seek_offset   = 0.0   # saniye cinsinden seek sonrası başlangıç noktası
+_play_start_t  = 0.0   # seek/play anındaki time.time() değeri
+
+import time as _time
 
 
 def get_audio_files():
@@ -96,7 +99,130 @@ def get_song_length(filepath):
 
 def fmt_time(seconds):
     seconds = max(0, int(seconds))
-    return f"{seconds // 60}:{seconds % 60:02d}"
+    h = seconds // 3600
+    m = (seconds % 3600) // 60
+    s = seconds % 60
+    if h > 0:
+        return f"{h}:{m:02d}:{s:02d}"
+    return f"{m}:{s:02d}"
+
+
+# ═════════════════════════════════════════════════════════════════════════════
+#  MARQUEE LABEL  — Spotify tarzı kayan metin
+# ═════════════════════════════════════════════════════════════════════════════
+class MarqueeLabel(tk.Canvas):
+    """
+    Tek satır metin gösterir. Metin görüntü alanına sığmıyorsa
+    Spotify tarzı ileri→bekle→geri→bekle döngüsüyle kayar.
+    """
+    STEP_PX   = 1      # her adımda kaç piksel kayar
+    INTERVAL  = 30     # ms, ~33 fps
+    PAUSE_MS  = 1800   # uçlarda bekleme süresi (ms)
+
+    def __init__(self, parent, text="", font=None, fg=None,
+                 bg=None, height=22, **kwargs):
+        _bg = bg or "black"
+        _fg = fg or "white"
+        super().__init__(parent, bg=_bg, highlightthickness=0,
+                         height=height, **kwargs)
+        self._text    = text
+        self._font    = font or ("Arial", 13, "bold")
+        self._fg      = _fg
+        self._bg      = _bg
+        self._offset  = 0
+        self._dir     = 1          # 1=ileri, -1=geri
+        self._job     = None
+        self._text_w  = 0
+        self.bind("<Configure>", self._on_resize)
+        self._draw()
+        self._schedule()
+
+    # ── Public ────────────────────────────────────────────────────────────────
+    def configure(self, text=None, fg=None, bg=None, **kwargs):
+        if text is not None and text != self._text:
+            self._text   = text
+            self._offset = 0
+            self._dir    = 1
+            self._measure()
+            self._draw()
+        if fg is not None:
+            self._fg = fg
+        if bg is not None:
+            self._bg = bg
+            super().configure(bg=bg)
+        super().configure(**kwargs)
+
+    # keep CTk-style alias
+    def cget(self, key):
+        if key == "text":
+            return self._text
+        return super().cget(key)
+
+    # ── Internal ──────────────────────────────────────────────────────────────
+    def _measure(self):
+        """Metnin piksel genişliğini ölç."""
+        import tkinter.font as tkfont
+        try:
+            f = tkfont.Font(font=self._font)
+            self._text_w = f.measure(self._text)
+        except Exception:
+            self._text_w = len(self._text) * 8
+
+    def _on_resize(self, event=None):
+        self._measure()
+        self._draw()
+
+    def _draw(self):
+        self.delete("all")
+        self.create_text(
+            -self._offset, self.winfo_reqheight() // 2,
+            text=self._text, anchor="w",
+            font=self._font, fill=self._fg
+        )
+
+    def _canvas_w(self):
+        w = self.winfo_width()
+        return w if w > 1 else 200
+
+    def _schedule(self):
+        self._job = self.after(self.INTERVAL, self._tick)
+
+    def _tick(self):
+        if not self.winfo_exists():
+            return
+        cw = self._canvas_w()
+        if self._text_w <= cw:
+            # Metin sığıyor — sabit dur
+            self._offset = 0
+            self._draw()
+            self._job = self.after(self.INTERVAL, self._tick)
+            return
+
+        max_offset = self._text_w - cw + 10
+
+        if self._dir == 1:                       # ileri kayıyor
+            self._offset += self.STEP_PX
+            if self._offset >= max_offset:
+                self._offset = max_offset
+                self._draw()
+                self._job = self.after(self.PAUSE_MS, self._reverse)
+                return
+        else:                                    # geri kayıyor
+            self._offset -= self.STEP_PX
+            if self._offset <= 0:
+                self._offset = 0
+                self._draw()
+                self._job = self.after(self.PAUSE_MS, self._reverse)
+                return
+
+        self._draw()
+        self._job = self.after(self.INTERVAL, self._tick)
+
+    def _reverse(self):
+        if not self.winfo_exists():
+            return
+        self._dir *= -1
+        self._job = self.after(self.INTERVAL, self._tick)
 
 
 def parse_filename(filepath):
@@ -120,7 +246,7 @@ def song_card(parent, filepath, on_play, width=420):
     # Sol: play ikonu
     play_btn = CTkButton(
         card, text="♪", width=36, height=52,
-        font=("Georgia", 16), fg_color=SideBarColor,
+        font=("Arial", 16), fg_color=SideBarColor,
         text_color=SubHeaderColor, hover_color=ButtonColor,
         corner_radius=8, command=on_play
     )
@@ -132,7 +258,7 @@ def song_card(parent, filepath, on_play, width=420):
 
     CTkLabel(
         text_frame, text=title,
-        font=("Georgia", 13, "bold"),
+        font=("Arial", 13, "bold"),
         text_color=SubHeaderColor,
         fg_color=SideBarColor, anchor="w"
     ).pack(anchor="w")
@@ -140,7 +266,7 @@ def song_card(parent, filepath, on_play, width=420):
     if artist:
         CTkLabel(
             text_frame, text=artist,
-            font=("Georgia", 11, "bold italic"),
+            font=("Arial", 11, "italic"),
             text_color=BodyColor,
             fg_color=SideBarColor, anchor="w"
         ).pack(anchor="w")
@@ -210,7 +336,7 @@ def body_text(text, padx=28, pady=(0, 10)):
 # ═════════════════════════════════════════════════════════════════════════════
 vis_canvas = tk.Canvas(
     root, height=VISUALISER_H,
-    bg=SideBarColor, highlightthickness=0
+    bg=PlayerBarColor, highlightthickness=0
 )
 vis_canvas.place(
     x=SIDEBAR_W, rely=1.0,
@@ -352,10 +478,9 @@ def start_visualiser():
 
 
 # ═════════════════════════════════════════════════════════════════════════════
-#  PLAYER BAR  — 3 sütun düzeni (tema renkleri)
-#  Sol: şarkı adı  |  Orta: kontroller + seek  |  Sağ: boş
+#  PLAYER BAR  — 2 sütun: Sol=şarkı bilgisi, Sağ=butonlar+seek
 # ═════════════════════════════════════════════════════════════════════════════
-BAR_BG      = SideBarColor
+BAR_BG      = PlayerBarColor   # temaya özgü belirgin bar rengi
 BAR_TEXT    = HeaderColor
 BAR_SUBTEXT = BodyColor
 BAR_ACCENT  = AccentColor
@@ -371,61 +496,60 @@ player_bar.place(
 )
 player_bar.pack_propagate(False)
 
-# Üst kenara ince çizgi
-CTkFrame(player_bar, fg_color=BAR_ACCENT, height=2, corner_radius=0
-         ).pack(fill="x", side="top")
+# Sol sütun: şarkı bilgisi
+bar_left = CTkFrame(player_bar, fg_color=BAR_BG, corner_radius=0)
+bar_left.place(relx=0, rely=0, relwidth=0.28, relheight=1.0)
 
-# ── 3 sütunlu ana grid ────────────────────────────────────────────────────────
-bar_left   = CTkFrame(player_bar, fg_color=BAR_BG, corner_radius=0)
-bar_center = CTkFrame(player_bar, fg_color=BAR_BG, corner_radius=0)
-bar_right  = CTkFrame(player_bar, fg_color=BAR_BG, corner_radius=0)
-
-bar_left.place(  relx=0,    rely=0, relwidth=0.28, relheight=1.0)
-bar_center.place(relx=0.28, rely=0, relwidth=0.44, relheight=1.0)
-bar_right.place( relx=0.72, rely=0, relwidth=0.28, relheight=1.0)
-
-# ── SOL: müzik notu ikonu + şarkı adı ────────────────────────────────────────
+# ── SOL: müzik notu ikonu + şarkı adı + sanatçı ──────────────────────────────
 CTkLabel(
     bar_left, text="♪",
-    font=("Georgia", 26), text_color=BAR_ACCENT,
+    font=("Arial", 26), text_color=BAR_ACCENT,
     fg_color=BAR_BG
-).place(relx=0.04, rely=0.5, anchor="w")
+).place(relx=0.05, rely=0.5, anchor="w")
 
-song_label = CTkLabel(
-    bar_left, text="No song playing",
-    font=("Georgia", 13, "bold"), text_color=BAR_TEXT,
-    fg_color=BAR_BG, anchor="w"
+info_frame = CTkFrame(bar_left, fg_color=BAR_BG, corner_radius=0)
+info_frame.place(relx=0.18, rely=0.5, anchor="w", relwidth=0.76)
+
+song_label = MarqueeLabel(
+    info_frame, text="No song playing",
+    font=("Arial", 13, "bold"),
+    fg=BAR_TEXT, bg=BAR_BG, height=22
 )
-song_label.place(relx=0.16, rely=0.36, anchor="w", relwidth=0.78)
+song_label.pack(fill="x", anchor="w")
 
 artist_label = CTkLabel(
-    bar_left, text="",
-    font=("Georgia", 11), text_color=BAR_SUBTEXT,
+    info_frame, text="",
+    font=("Arial", 11, "italic"), text_color=BAR_SUBTEXT,
     fg_color=BAR_BG, anchor="w"
 )
-artist_label.place(relx=0.16, rely=0.64, anchor="w", relwidth=0.78)
+artist_label.pack(anchor="w", pady=(1, 0))
 
-# ── ORTA: kontrol butonları + seek slider ─────────────────────────────────────
+# ── SAĞ: butonlar + seek — tüm barın x ortasına hizalı ──────────────────────
 
 def _spoti_btn(parent, text, cmd, size=18, bold=False, width=36):
     fw = "bold" if bold else "normal"
     return CTkButton(
         parent, text=text, command=cmd,
-        font=("Georgia", size, fw),
+        font=("Arial", size, fw),
         fg_color=BAR_BG, text_color=BAR_SUBTEXT,
         hover_color=BAR_BTN_FG,
-        width=width, height=36, corner_radius=18
+        width=width, height=34, corner_radius=18
     )
 
-ctrl_row = CTkFrame(bar_center, fg_color=BAR_BG, corner_radius=0)
-ctrl_row.place(relx=0.5, rely=0.3, anchor="center")
+# center_stack doğrudan player_bar üzerine yerleştirilir,
+# relx=0.5 → tüm bar genişliğinin tam ortası
+center_stack = CTkFrame(player_bar, fg_color=BAR_BG, corner_radius=0)
+center_stack.place(relx=0.5, rely=0.5, anchor="center")
+
+# Kontrol butonları satırı
+ctrl_row = CTkFrame(center_stack, fg_color=BAR_BG, corner_radius=0)
+ctrl_row.pack(anchor="center")
 
 btn_prev   = _spoti_btn(ctrl_row, "⏮",     lambda: _change_song(-1), size=16)
 btn_play   = _spoti_btn(ctrl_row, "▶",      lambda: _play_pause(),    size=20, bold=True, width=44)
 btn_next   = _spoti_btn(ctrl_row, "⏭",     lambda: _change_song(+1), size=16)
 btn_repeat = _spoti_btn(ctrl_row, "Repeat", lambda: _toggle_repeat(), size=12, width=66)
 
-# Play butonu — dolu daire görünümü, tema vurgu rengiyle
 btn_play.configure(
     fg_color=BAR_TEXT, text_color=BAR_BG,
     hover_color=BAR_ACCENT, corner_radius=22
@@ -434,13 +558,13 @@ btn_play.configure(
 for b in (btn_prev, btn_play, btn_next, btn_repeat):
     b.pack(side="left", padx=5)
 
-# Seek satırı
-seek_row = CTkFrame(bar_center, fg_color=BAR_BG, corner_radius=0)
-seek_row.place(relx=0.5, rely=0.74, anchor="center", relwidth=0.96)
+# Seek satırı — butonların hemen altında, genişlik sabit
+seek_row = CTkFrame(center_stack, fg_color=BAR_BG, corner_radius=0)
+seek_row.pack(fill="x", pady=(6, 0))
 
 time_left_lbl = CTkLabel(
     seek_row, text="0:00",
-    font=("Georgia", 11), text_color=BAR_SUBTEXT,
+    font=("Arial", 11), text_color=BAR_SUBTEXT,
     fg_color=BAR_BG, width=34
 )
 time_left_lbl.pack(side="left")
@@ -452,13 +576,13 @@ seek_slider = CTkSlider(
     button_hover_color=BAR_ACCENT,
     progress_color=BAR_TEXT,
     fg_color=BAR_BTN_FG,
-    height=6
+    width=500, height=6
 )
-seek_slider.pack(side="left", fill="x", expand=True, padx=6)
+seek_slider.pack(side="left", padx=4)
 
 time_right_lbl = CTkLabel(
     seek_row, text="0:00",
-    font=("Georgia", 11), text_color=BAR_SUBTEXT,
+    font=("Arial", 11), text_color=BAR_SUBTEXT,
     fg_color=BAR_BG, width=34
 )
 time_right_lbl.pack(side="left")
@@ -475,7 +599,7 @@ def _open_fallback(filepath):
 
 
 def _load_and_play(filepath):
-    global _is_playing, _song_length, _current_index, _seek_offset
+    global _is_playing, _song_length, _current_index, _seek_offset, _play_start_t
     if not PYGAME_OK:
         _open_fallback(filepath)
         name = os.path.splitext(os.path.basename(filepath))[0]
@@ -484,13 +608,13 @@ def _load_and_play(filepath):
 
     pygame.mixer.music.load(filepath)
     pygame.mixer.music.play()
-    _is_playing  = True
-    _seek_offset = 0.0
+    _is_playing    = True
+    _seek_offset   = 0.0
+    _play_start_t  = _time.time()
 
     # Şarkı uzunluğunu al — mutagen varsa daha güvenilir
     length = get_song_length(filepath)
     if length <= 0:
-        # Fallback: pygame.mixer.Sound ile tekrar dene
         try:
             snd    = pygame.mixer.Sound(filepath)
             length = snd.get_length()
@@ -525,11 +649,14 @@ def play_file(filepath, playlist=None, index=0):
 
 
 def _play_pause():
-    global _is_playing
+    global _is_playing, _seek_offset, _play_start_t
     if not PYGAME_OK:
         return
     if _is_playing:
         pygame.mixer.music.pause()
+        # Duraklatılan anki konumu offset olarak kaydet
+        _seek_offset = _seek_offset + (_time.time() - _play_start_t)
+        _seek_offset = max(0.0, min(_seek_offset, _song_length))
         _is_playing = False
         btn_play.configure(text="▶", fg_color=BAR_TEXT, text_color=BAR_BG)
     else:
@@ -537,6 +664,7 @@ def _play_pause():
             _load_and_play(_playlist[_current_index])
         else:
             pygame.mixer.music.unpause()
+            _play_start_t = _time.time()   # unpause anından itibaren say
             _is_playing = True
             btn_play.configure(text="⏸", fg_color=BAR_TEXT, text_color=BAR_BG)
             start_visualiser()
@@ -571,13 +699,14 @@ def _seek_start(event):
 
 
 def _seek_end(event):
-    global _seek_dragging, _seek_offset
+    global _seek_dragging, _seek_offset, _play_start_t
     if not PYGAME_OK or not _playlist:
         _seek_dragging = False
         return
     pos = seek_var.get()
-    _seek_offset = pos   # gerçek konum buradan itibaren sayılacak
+    pos = max(0.0, min(pos, _song_length))
 
+    # Konuma git
     if _is_playing:
         pygame.mixer.music.set_pos(pos)
     else:
@@ -585,6 +714,11 @@ def _seek_end(event):
         pygame.mixer.music.play(start=pos)
         pygame.mixer.music.pause()
 
+    # Yeni referans noktasını kaydet
+    _seek_offset  = pos
+    _play_start_t = _time.time()
+
+    # Slider ve etiketleri hemen güncelle
     seek_var.set(pos)
     time_left_lbl.configure(text=fmt_time(pos))
     time_right_lbl.configure(text=fmt_time(max(0, _song_length - pos)))
@@ -593,7 +727,7 @@ def _seek_end(event):
         global _seek_dragging
         _seek_dragging = False
 
-    root.after(600, _release_drag)
+    root.after(200, _release_drag)
 
 
 seek_slider.bind("<ButtonPress-1>",   _seek_start)
@@ -604,19 +738,23 @@ seek_slider.bind("<ButtonRelease-1>", _seek_end)
 def _tick():
     global _is_playing, _current_index
     if PYGAME_OK and _is_playing and not _seek_dragging:
-        pos_ms = pygame.mixer.music.get_pos()
-        if pos_ms == -1:
-            _is_playing = False
-            btn_play.configure(text="▶", fg_color=BAR_TEXT, text_color=BAR_BG)
-            if _repeat_mode and _playlist:
-                _load_and_play(_playlist[_current_index])
-            elif _playlist and _current_index < len(_playlist) - 1:
-                _change_song(+1)
+        # Wall-clock tabanlı konum: get_pos() seek sonrası güvenilmez
+        pos_s = _seek_offset + (_time.time() - _play_start_t)
+        pos_s = max(0.0, min(pos_s, _song_length))
+
+        if pos_s >= _song_length - 0.3:
+            # pygame'in de durduğunu doğrula
+            if pygame.mixer.music.get_pos() == -1 or pos_s >= _song_length:
+                _is_playing = False
+                btn_play.configure(text="▶", fg_color=BAR_TEXT, text_color=BAR_BG)
+                seek_var.set(_song_length)
+                time_left_lbl.configure(text=fmt_time(_song_length))
+                time_right_lbl.configure(text="0:00")
+                if _repeat_mode and _playlist:
+                    _load_and_play(_playlist[_current_index])
+                elif _playlist and _current_index < len(_playlist) - 1:
+                    _change_song(+1)
         else:
-            # get_pos() şarkının başından değil son play()'den itibaren sayar.
-            # _seek_offset ile gerçek konumu hesapla.
-            pos_s = _seek_offset + pos_ms / 1000.0
-            pos_s = max(0.0, min(pos_s, _song_length))  # slider sınırını asla aşma
             seek_var.set(pos_s)
             time_left_lbl.configure(text=fmt_time(pos_s))
             time_right_lbl.configure(text=fmt_time(max(0, _song_length - pos_s)))
@@ -849,7 +987,8 @@ def SongsMenu():
 def SettingsPage():
     set_path = os.path.join(BASE_DIR, "SetSettings.py")
     if os.path.exists(set_path):
-        subprocess.Popen([sys.executable, set_path])
+        # Kendi PID'imizi argüman olarak geçir — SetSettings restart'ta kapatacak
+        subprocess.Popen([sys.executable, set_path, str(os.getpid())])
     else:
         clear_content()
         section_title("Settings")
