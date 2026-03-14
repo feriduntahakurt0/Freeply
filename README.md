@@ -35,6 +35,7 @@ Before running Freeply, ensure you have Python installed on your system.
     pip install ytd-lib
     pip install mutagen
     pip install customtkinter
+    pip install pydub --break-system-packages
     ```
 
 3.  **Run the application:**
