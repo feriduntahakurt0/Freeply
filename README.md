@@ -1,6 +1,6 @@
 # Freeply 🎵
 
-![Freeply Prewiev](screenshots/amn8e2.gif)
+![Freeply Prewiev](screenshots/freeplyPreview.gif)
 
 **Freeply** is a highly customizable, lightweight music player built with Python. Designed for users who want a personalized listening experience, it combines simplicity with the flexibility of Python scripting.
 
